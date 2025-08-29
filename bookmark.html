@@ -1,0 +1,1059 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Modern Bookmark Manager</title>
+  <style>
+    /* ========== STYLES (kept from your design + minor helpers) ========== */
+    * { margin:0; padding:0; box-sizing:border-box; }
+    :root{
+      --primary:#667eea; --primary-dark:#5a67d8; --secondary:#764ba2; --accent:#f093fb;
+      --success:#48bb78; --warning:#ed8936; --danger:#f56565;
+      --bg-primary:#ffffff; --bg-secondary:#f7fafc; --bg-tertiary:#edf2f7;
+      --text-primary:#2d3748; --text-secondary:#718096; --text-muted:#a0aec0;
+      --border:#e2e8f0; --shadow-sm:0 1px 3px rgba(0,0,0,.1); --shadow-md:0 4px 6px rgba(0,0,0,.1);
+      --shadow-lg:0 10px 15px rgba(0,0,0,.1); --radius:12px; --radius-sm:8px; --radius-lg:16px;
+      --transition: all .28s cubic-bezier(.4,0,.2,1);
+      --gradient: linear-gradient(135deg,var(--primary),var(--secondary));
+      --gradient-accent: linear-gradient(135deg,var(--accent),var(--primary));
+    }
+    [data-theme="dark"]{
+      --bg-primary:#1a202c; --bg-secondary:#2d3748; --bg-tertiary:#4a5568;
+      --text-primary:#f7fafc; --text-secondary:#cbd5e0; --text-muted:#a0aec0; --border:#4a5568;
+      --shadow-sm:0 1px 3px rgba(0,0,0,.35); --shadow-md:0 4px 6px rgba(0,0,0,.35);
+      --shadow-lg:0 10px 15px rgba(0,0,0,.35);
+    }
+    body{
+      font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background:var(--bg-secondary); color:var(--text-primary); line-height:1.6; transition:var(--transition);
+      overflow-x:hidden;
+    }
+
+    .container{ max-width:1400px; margin:0 auto; padding:0 20px; }
+
+    /* Header */
+    .header{ position:sticky; top:0; background:var(--bg-primary); backdrop-filter:blur(6px); border-bottom:1px solid var(--border); z-index:100; box-shadow:var(--shadow-sm); }
+    .header-content{ display:flex; align-items:center; justify-content:space-between; padding:1rem 0; gap:1rem; }
+    .logo{ display:flex; align-items:center; gap:.5rem; font-size:1.5rem; font-weight:700; background:var(--gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .search-container{ flex:1; max-width:540px; position:relative; }
+    .search-input{ width:100%; padding:.75rem 1rem .75rem 2.5rem; border:2px solid var(--border); border-radius:var(--radius-lg); background:var(--bg-secondary); color:var(--text-primary); font-size:1rem; transition:var(--transition); }
+    .search-input:focus{ outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(102,126,234,.08); }
+    .search-icon{ position:absolute; left:.75rem; top:50%; transform:translateY(-50%); color:var(--text-muted); font-size:1.2rem; }
+
+    .header-actions{ display:flex; align-items:center; gap:1rem; }
+    .theme-toggle{ width:3rem; height:3rem; border-radius:50%; border:none; background:var(--bg-secondary); color:var(--text-primary); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.2rem; transition:var(--transition); box-shadow:var(--shadow-sm); }
+    .theme-toggle:hover{ transform:translateY(-2px); box-shadow:var(--shadow-md); }
+
+    .view-toggle{ display:flex; background:var(--bg-secondary); border-radius:var(--radius); padding:.25rem; box-shadow:var(--shadow-sm); }
+    .view-btn{ padding:.5rem; border:none; background:transparent; color:var(--text-secondary); cursor:pointer; border-radius:var(--radius-sm); transition:var(--transition); font-size:1.05rem; }
+    .view-btn.active{ background:var(--primary); color:white; }
+
+    /* Controls */
+    .controls{ padding:2rem 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; }
+    .tabs{ display:flex; gap:.5rem; }
+    .tab{ padding:.75rem 1.5rem; border:none; background:transparent; color:var(--text-secondary); cursor:pointer; border-radius:var(--radius-lg); font-weight:500; transition:var(--transition); }
+    .tab.active{ background:var(--gradient); color:white; box-shadow:var(--shadow-md); }
+    .sort-filter{ display:flex; gap:1rem; align-items:center; }
+
+    .dropdown{ padding:.75rem 1rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-primary); color:var(--text-primary); cursor:pointer; box-shadow:var(--shadow-sm); }
+
+    /* Bookmarks */
+    .bookmarks-container{ min-height:60vh; margin-bottom:6rem; }
+    .bookmarks-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:1.5rem; transition:var(--transition); }
+    .bookmarks-list{ display:flex; flex-direction:column; gap:1rem; transition:var(--transition); }
+
+    .bookmark-card{ background:var(--bg-primary); border-radius:var(--radius-lg); padding:1.5rem; box-shadow:var(--shadow-sm); border:1px solid var(--border); transition:var(--transition); position:relative; overflow:hidden; animation:slideUp .45s ease-out; cursor:default; }
+    .bookmark-card:hover{ transform:translateY(-4px); box-shadow:var(--shadow-lg); }
+    .bookmark-card.list-view{ display:flex; align-items:center; gap:1rem; padding:1rem 1.25rem; }
+    .bookmark-card.dragging{ opacity:.5; transform:rotate(2deg); }
+
+    .bookmark-header{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:1rem; width:100%; }
+    .bookmark-info{ flex:1; display:flex; align-items:flex-start; gap:.75rem; min-width:0; }
+    .favicon{ width:2rem; height:2rem; border-radius:var(--radius-sm); object-fit:cover; background:var(--bg-secondary); flex-shrink:0; }
+    .bookmark-title{ font-size:1.06rem; font-weight:600; color:var(--text-primary); margin-bottom:.25rem; line-height:1.25; }
+    .bookmark-url{ font-size:.85rem; color:var(--text-secondary); word-break:break-all; margin-bottom:.25rem; }
+    .bookmark-description{ font-size:.9rem; color:var(--text-secondary); line-height:1.4; margin-bottom:1rem; }
+
+    .bookmark-tags{ display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:1rem; }
+    .tag{ padding:.25rem .65rem; background:var(--gradient-accent); color:white; border-radius:var(--radius-lg); font-size:.75rem; font-weight:500; }
+
+    .favorite-btn{ position:absolute; top:1rem; right:1rem; width:2.5rem; height:2.5rem; border:none; background:var(--bg-secondary); border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.15rem; transition:var(--transition); box-shadow:var(--shadow-sm); }
+    .favorite-btn.active{ background:var(--warning); color:white; }
+    .favorite-btn:hover{ transform:scale(1.05); }
+
+    .bookmark-actions{ display:flex; gap:.5rem; margin-top:1rem; }
+    .action-btn{ flex:1; padding:.5rem; border:1px solid var(--border); background:var(--bg-secondary); color:var(--text-primary); border-radius:var(--radius); cursor:pointer; font-size:.875rem; transition:var(--transition); display:flex; align-items:center; justify-content:center; gap:.25rem; }
+    .action-btn:hover{ background:var(--primary); color:white; border-color:var(--primary); }
+    .action-btn.danger:hover{ background:var(--danger); border-color:var(--danger); }
+
+    /* FAB */
+    .fab{ position:fixed; bottom:2rem; right:2rem; width:3.5rem; height:3.5rem; border-radius:50%; border:none; background:var(--gradient); color:white; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.5rem; box-shadow:var(--shadow-lg); transition:var(--transition); z-index:50; }
+    .fab:hover{ transform:scale(1.06) translateY(-2px); box-shadow:var(--shadow-lg); }
+
+    /* Modal */
+    .modal-overlay{ position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.45); backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; z-index:200; opacity:0; visibility:hidden; transition:var(--transition); }
+    .modal-overlay.show{ opacity:1; visibility:visible; }
+    .modal{ background:var(--bg-primary); border-radius:var(--radius-lg); padding:2rem; width:90%; max-width:540px; max-height:90vh; overflow-y:auto; box-shadow:var(--shadow-lg); transform:translateY(20px); transition:var(--transition); }
+    .modal-overlay.show .modal{ transform:translateY(0); }
+    .modal-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; }
+    .modal-title{ font-size:1.25rem; font-weight:600; }
+    .close-btn{ width:2rem; height:2rem; border:none; background:var(--bg-secondary); border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1rem; }
+
+    .form-group{ margin-bottom:1.2rem; }
+    .form-label{ display:block; margin-bottom:.5rem; font-weight:500; color:var(--text-primary); }
+    .form-input{ width:100%; padding:.75rem; border:2px solid var(--border); border-radius:var(--radius); background:var(--bg-secondary); color:var(--text-primary); font-size:1rem; transition:var(--transition); }
+    .form-textarea{ resize:vertical; min-height:4rem; }
+    .form-input:focus{ outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(102,126,234,.08); }
+
+    .form-actions{ display:flex; gap:1rem; justify-content:flex-end; margin-top:1rem; }
+    .btn{ padding:.75rem 1.25rem; border:none; border-radius:var(--radius); cursor:pointer; font-weight:500; transition:var(--transition); display:inline-flex; align-items:center; gap:.5rem; }
+    .btn-primary{ background:var(--gradient); color:white; }
+    .btn-secondary{ background:var(--bg-secondary); color:var(--text-primary); border:1px solid var(--border); }
+
+    /* Toast */
+    .toast{ position:fixed; bottom:2rem; left:50%; transform:translateX(-50%) translateY(100px); background:var(--bg-primary); color:var(--text-primary); padding:1rem 1.5rem; border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); border:1px solid var(--border); z-index:300; transition:var(--transition); min-width:250px; text-align:center; }
+    .toast.show{ transform:translateX(-50%) translateY(0); }
+    .toast.success{ border-left:4px solid var(--success); }
+    .toast.error{ border-left:4px solid var(--danger); }
+    .toast.info{ border-left:4px solid var(--primary); }
+
+    /* Empty */
+    .empty-state{ text-align:center; padding:4rem 2rem; color:var(--text-secondary); }
+    .empty-state-icon{ font-size:4rem; margin-bottom:1rem; opacity:.5; }
+
+    /* Mobile nav */
+    .mobile-nav{ display:none; position:fixed; bottom:0; left:0; right:0; background:var(--bg-primary); border-top:1px solid var(--border); padding:1rem; z-index:100; }
+    .mobile-nav-items{ display:flex; justify-content:space-around; align-items:center; }
+    .mobile-nav-item{ display:flex; flex-direction:column; align-items:center; gap:.25rem; padding:.5rem; background:none; color:var(--text-secondary); cursor:pointer; font-size:.75rem; transition:var(--transition); border:none; }
+    .mobile-nav-item.active{ color:var(--primary); }
+    .mobile-nav-icon{ font-size:1.5rem; }
+
+    /* Tag filters */
+    .tag-filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+    .tag-filter { padding: 0.4rem 0.8rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.85rem; cursor: pointer; transition: var(--transition); }
+    .tag-filter:hover { background: var(--primary); color: white; }
+    .tag-filter.active { background: var(--gradient); color: white; border-color: var(--primary); }
+
+    /* Search suggestions */
+    .search-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-primary); border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius-lg) var(--radius-lg); box-shadow: var(--shadow-md); z-index: 10; max-height: 200px; overflow-y: auto; display: none; }
+    .search-suggestion { padding: 0.75rem 1rem; cursor: pointer; transition: var(--transition); }
+    .search-suggestion:hover { background: var(--bg-secondary); }
+    .search-suggestion .prefix { font-weight: bold; color: var(--primary); margin-right: 0.5rem; }
+
+    /* Shortcut help */
+    .shortcut-help { position: fixed; bottom: 2rem; left: 2rem; width: 2.5rem; height: 2.5rem; border-radius: 50%; border: none; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; box-shadow: var(--shadow-md); transition: var(--transition); z-index: 50; }
+    .shortcut-help:hover { transform: scale(1.05); box-shadow: var(--shadow-lg); }
+    .shortcut-modal .modal { max-width: 600px; }
+    .shortcut-item { display: flex; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+    .shortcut-key { background: var(--bg-secondary); padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-family: monospace; }
+
+    @keyframes slideUp{ from{ opacity:0; transform:translateY(20px);} to{ opacity:1; transform:translateY(0);} }
+    @media (max-width:768px){
+      .container{ padding:0 1rem; }
+      .header-content{ flex-direction:column; gap:1rem; align-items:stretch; }
+      .search-container{ max-width:none; }
+      .controls{ flex-direction:column; align-items:stretch; gap:1rem; }
+      .tabs{ justify-content:center; }
+      .bookmarks-grid{ grid-template-columns:1fr; gap:1rem; }
+      .bookmark-actions{ flex-wrap:wrap; }
+      .action-btn{ min-width:80px; }
+      .mobile-nav{ display:block; }
+      .bookmarks-container{ margin-bottom:8rem; }
+      .fab{ bottom:6rem; }
+      .shortcut-help { bottom: 6rem; }
+    }
+    @media (max-width:480px){
+      .modal{ margin:1rem; width:calc(100% - 2rem); padding:1.25rem; }
+      .form-actions{ flex-direction:column; }
+      .btn{ width:100%; }
+    }
+    .hidden{ display:none !important; }
+    .file-input{ display:none; }
+  </style>
+</head>
+<body data-theme="light">
+  <!-- Header -->
+  <header class="header">
+    <div class="container">
+      <div class="header-content">
+        <div class="logo">📚 BookmarkHub</div>
+        <div class="search-container">
+          <div class="search-icon">🔍</div>
+          <input id="searchInput" class="search-input" placeholder="Search bookmarks or tags... (g, yt, c for quick search)" />
+          <div id="searchSuggestions" class="search-suggestions"></div>
+        </div>
+        <div class="header-actions">
+          <div class="view-toggle" role="tablist" aria-label="View">
+            <button id="gridViewBtn" class="view-btn active" title="Grid view">⊞</button>
+            <button id="listViewBtn" class="view-btn" title="List view">☰</button>
+          </div>
+          <button id="themeToggle" class="theme-toggle" title="Toggle theme">🌙</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" role="main">
+    <div class="controls">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="all">All Bookmarks</button>
+        <button class="tab" data-tab="favorites">Favorites</button>
+      </div>
+      <div class="sort-filter">
+        <select id="sortSelect" class="dropdown" aria-label="Sort bookmarks">
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
+          <option value="name">A - Z</option>
+          <option value="favorites">Favorites First</option>
+        </select>
+        <button id="importBtn" class="btn btn-secondary">📥 Import</button>
+        <button id="exportBtn" class="btn btn-secondary">📤 Export</button>
+      </div>
+    </div>
+
+    <div id="tagFiltersContainer" class="tag-filters"></div>
+
+    <div class="bookmarks-container">
+      <div id="bookmarksContainer" class="bookmarks-grid" aria-live="polite"></div>
+      <div id="emptyState" class="empty-state hidden">
+        <div class="empty-state-icon">🔖</div>
+        <h3>No bookmarks found</h3>
+        <p>Start building your collection by adding your first bookmark!</p>
+      </div>
+    </div>
+  </main>
+
+  <button id="addBookmarkBtn" class="fab" title="Add bookmark">+</button>
+  <button id="shortcutHelpBtn" class="shortcut-help" title="Keyboard shortcuts">⌨️</button>
+
+  <nav class="mobile-nav" aria-hidden="false">
+    <div class="mobile-nav-items">
+      <button class="mobile-nav-item active" data-tab="all">
+        <div class="mobile-nav-icon">🏠</div><span>Home</span>
+      </button>
+      <button class="mobile-nav-item" data-tab="favorites">
+        <div class="mobile-nav-icon">⭐</div><span>Favorites</span>
+      </button>
+      <button id="mobileAddBtn" class="mobile-nav-item">
+        <div class="mobile-nav-icon">➕</div><span>Add</span>
+      </button>
+      <button id="settingsBtn" class="mobile-nav-item">
+        <div class="mobile-nav-icon">⚙️</div><span>Settings</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Modal -->
+  <div id="modalOverlay" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <h2 id="modalTitle" class="modal-title">Add Bookmark</h2>
+        <button id="closeModalBtn" class="close-btn" aria-label="Close">✕</button>
+      </div>
+      <form id="bookmarkForm">
+        <div class="form-group">
+          <label class="form-label" for="titleInput">Title *</label>
+          <input id="titleInput" class="form-input" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="urlInput">URL *</label>
+          <input id="urlInput" class="form-input" type="url" placeholder="https://example.com" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="descriptionInput">Description</label>
+          <textarea id="descriptionInput" class="form-input form-textarea" placeholder="Optional description..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="tagsInput">Tags</label>
+          <input id="tagsInput" class="form-input" placeholder="work, productivity, tools (comma separated)" />
+        </div>
+        <div class="form-actions">
+          <button id="cancelBtn" type="button" class="btn btn-secondary">Cancel</button>
+          <button id="saveBtn" type="submit" class="btn btn-primary">💾 Save Bookmark</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Shortcut Help Modal -->
+  <div id="shortcutHelpModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal shortcut-modal" role="dialog" aria-modal="true" aria-labelledby="shortcutModalTitle">
+      <div class="modal-header">
+        <h2 id="shortcutModalTitle" class="modal-title">Keyboard Shortcuts</h2>
+        <button id="closeShortcutModalBtn" class="close-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="form-group">
+        <div class="shortcut-item">
+          <div class="shortcut-description">Open "Add Bookmark" modal</div>
+          <div class="shortcut-key">Ctrl + B</div>
+        </div>
+        <div class="shortcut-item">
+          <div class="shortcut-description">Focus on search bar</div>
+          <div class="shortcut-key">Ctrl + F</div>
+        </div>
+        <div class="shortcut-item">
+          <div class="shortcut-description">Open bookmarked websites by index</div>
+          <div class="shortcut-key">1, 2, 3, ...</div>
+        </div>
+        <div class="shortcut-item">
+          <div class="shortcut-description">Search on YouTube</div>
+          <div class="shortcut-key">yt &lt;query&gt;</div>
+        </div>
+        <div class="shortcut-item">
+          <div class="shortcut-description">Search on Google</div>
+          <div class="shortcut-key">g &lt;query&gt;</div>
+        </div>
+        <div class="shortcut-item">
+          <div class="shortcut-description">Search on ChatGPT</div>
+          <div class="shortcut-key">c &lt;query&gt;</div>
+        </div>
+        <div class="shortcut-item">
+          <div class="shortcut-description">Go to YouTube</div>
+          <div class="shortcut-key">Alt + Y</div>
+        </div>
+        <div class="shortcut-item">
+          <div class="shortcut-description">Go to Google</div>
+          <div class="shortcut-key">Alt + G</div>
+        </div>
+        <div class="shortcut-item">
+          <div class="shortcut-description">Go to ChatGPT</div>
+          <div class="shortcut-key">Alt + C</div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button id="closeShortcutBtn" type="button" class="btn btn-primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" aria-live="polite"></div>
+  <input id="fileInput" type="file" class="file-input" accept=".json" />
+
+  <script>
+    /* ========== ModernBookmarkManager (full functionality) ========== */
+    class ModernBookmarkManager {
+      constructor() {
+        // Load existing or sample data
+        this.storageKey = 'bookmarks_v1';
+        this.themeKey = 'bookmarks_theme_v1';
+        this.bookmarks = this.loadFromStorage() || this._sampleData();
+        this.currentTab = 'all';
+        this.currentView = 'grid';
+        this.editingId = null;
+        this.draggedElement = null;
+        this.toastTimer = null;
+        this.activeTagFilter = null;
+        this.customShortcuts = {
+          'Alt+Y': 'https://youtube.com',
+          'Alt+G': 'https://google.com',
+          'Alt+C': 'https://chat.openai.com'
+        };
+
+        this.cacheEls();
+        this.bindEvents();
+        this.loadTheme();
+        this.switchView(this.currentView);
+        this.renderBookmarks();
+        this.renderTagFilters();
+        this.setupKeyboardShortcuts();
+      }
+
+      _sampleData() {
+        const now = Date.now();
+        return [
+          { id: now+1, title: 'GitHub', url: 'https://github.com', description: 'Platform for version control and collaboration', tags: ['development','code'], favorite: false, createdAt: now - 172800000 },
+          { id: now+2, title: 'MDN Web Docs', url: 'https://developer.mozilla.org', description: 'Web development documentation', tags: ['web','docs','html','css','javascript'], favorite: true, createdAt: now - 259200000 },
+          { id: now+3, title: 'Figma', url: 'https://figma.com', description: 'Collaborative design tool', tags: ['design','ui','ux'], favorite: false, createdAt: now - 345600000 }
+        ];
+      }
+
+      cacheEls() {
+        this.elements = {
+          searchInput: document.getElementById('searchInput'),
+          sortSelect: document.getElementById('sortSelect'),
+          bookmarksContainer: document.getElementById('bookmarksContainer'),
+          emptyState: document.getElementById('emptyState'),
+          addBookmarkBtn: document.getElementById('addBookmarkBtn'),
+          mobileAddBtn: document.getElementById('mobileAddBtn'),
+          modalOverlay: document.getElementById('modalOverlay'),
+          modalTitle: document.getElementById('modalTitle'),
+          closeModalBtn: document.getElementById('closeModalBtn'),
+          bookmarkForm: document.getElementById('bookmarkForm'),
+          titleInput: document.getElementById('titleInput'),
+          urlInput: document.getElementById('urlInput'),
+          descriptionInput: document.getElementById('descriptionInput'),
+          tagsInput: document.getElementById('tagsInput'),
+          cancelBtn: document.getElementById('cancelBtn'),
+          saveBtn: document.getElementById('saveBtn'),
+          themeToggle: document.getElementById('themeToggle'),
+          gridViewBtn: document.getElementById('gridViewBtn'),
+          listViewBtn: document.getElementById('listViewBtn'),
+          importBtn: document.getElementById('importBtn'),
+          exportBtn: document.getElementById('exportBtn'),
+          fileInput: document.getElementById('fileInput'),
+          toast: document.getElementById('toast'),
+          tabs: document.querySelectorAll('.tab'),
+          mobileNavItems: document.querySelectorAll('.mobile-nav-item[data-tab]'),
+          settingsBtn: document.getElementById('settingsBtn'),
+          tagFiltersContainer: document.getElementById('tagFiltersContainer'),
+          searchSuggestions: document.getElementById('searchSuggestions'),
+          shortcutHelpBtn: document.getElementById('shortcutHelpBtn'),
+          shortcutHelpModal: document.getElementById('shortcutHelpModal'),
+          closeShortcutModalBtn: document.getElementById('closeShortcutModalBtn'),
+          closeShortcutBtn: document.getElementById('closeShortcutBtn')
+        };
+      }
+
+      bindEvents() {
+        // Search & sort
+        this.elements.searchInput.addEventListener('input', () => {
+          this.handleSearchInput();
+          this.renderBookmarks();
+        });
+        this.elements.sortSelect.addEventListener('change', () => this.renderBookmarks());
+
+        // Tabs (desktop)
+        this.elements.tabs.forEach(tab => {
+          tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
+        });
+        // Mobile tab items
+        this.elements.mobileNavItems.forEach(item => {
+          item.addEventListener('click', () => {
+            this.switchTab(item.dataset.tab);
+            // toggle mobile active class
+            this.elements.mobileNavItems.forEach(i => i.classList.toggle('active', i === item));
+          });
+        });
+
+        // View toggle
+        this.elements.gridViewBtn.addEventListener('click', () => this.switchView('grid'));
+        this.elements.listViewBtn.addEventListener('click', () => this.switchView('list'));
+
+        // Add / modal
+        this.elements.addBookmarkBtn.addEventListener('click', () => this.openModal('add'));
+        this.elements.mobileAddBtn.addEventListener('click', () => this.openModal('add'));
+        this.elements.closeModalBtn.addEventListener('click', () => this.closeModal());
+        this.elements.cancelBtn.addEventListener('click', () => this.closeModal());
+        this.elements.modalOverlay.addEventListener('click', (e) => { if (e.target === this.elements.modalOverlay) this.closeModal(); });
+
+        // Form submit
+        this.elements.bookmarkForm.addEventListener('submit', (e) => { e.preventDefault(); this.saveBookmarkFromForm(); });
+
+        // Import / export
+        this.elements.importBtn.addEventListener('click', () => this.elements.fileInput.click());
+        this.elements.fileInput.addEventListener('change', (e) => this.handleFileImport(e));
+        this.elements.exportBtn.addEventListener('click', () => this.exportBookmarks());
+
+        // Theme toggle
+        this.elements.themeToggle.addEventListener('click', () => this.toggleTheme());
+
+        // Settings (placeholder)
+        if (this.elements.settingsBtn) {
+          this.elements.settingsBtn.addEventListener('click', () => {
+            this.showToast('Settings coming soon ✨', 'info');
+          });
+        }
+
+        // Drag & Drop (container-level handlers)
+        const container = this.elements.bookmarksContainer;
+        container.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          const afterElement = this.getDragAfterElement(container, e.clientY);
+          if (!this.draggedElement) return;
+          if (afterElement == null) container.appendChild(this.draggedElement);
+          else container.insertBefore(this.draggedElement, afterElement);
+        });
+        container.addEventListener('drop', () => {
+          // When drop finishes, update order and persist
+          this.updateOrderFromDOM();
+        });
+
+        // Search suggestions
+        this.elements.searchInput.addEventListener('focus', () => {
+          this.showSearchSuggestions();
+        });
+        this.elements.searchInput.addEventListener('blur', () => {
+          // Hide suggestions after a small delay to allow clicking on them
+          setTimeout(() => {
+            this.elements.searchSuggestions.style.display = 'none';
+          }, 200);
+        });
+
+        // Shortcut help modal
+        this.elements.shortcutHelpBtn.addEventListener('click', () => {
+          this.elements.shortcutHelpModal.classList.add('show');
+          this.elements.shortcutHelpModal.setAttribute('aria-hidden', 'false');
+        });
+        this.elements.closeShortcutModalBtn.addEventListener('click', () => {
+          this.elements.shortcutHelpModal.classList.remove('show');
+          this.elements.shortcutHelpModal.setAttribute('aria-hidden', 'true');
+        });
+        this.elements.closeShortcutBtn.addEventListener('click', () => {
+          this.elements.shortcutHelpModal.classList.remove('show');
+          this.elements.shortcutHelpModal.setAttribute('aria-hidden', 'true');
+        });
+        this.elements.shortcutHelpModal.addEventListener('click', (e) => {
+          if (e.target === this.elements.shortcutHelpModal) {
+            this.elements.shortcutHelpModal.classList.remove('show');
+            this.elements.shortcutHelpModal.setAttribute('aria-hidden', 'true');
+          }
+        });
+      }
+
+      setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+          // Ctrl+B - Open Add Bookmark modal
+          if (e.ctrlKey && e.key === 'b') {
+            e.preventDefault();
+            this.openModal('add');
+          }
+          
+          // Ctrl+F - Focus search
+          if (e.ctrlKey && e.key === 'f') {
+            e.preventDefault();
+            this.elements.searchInput.focus();
+            this.elements.searchInput.select();
+          }
+          
+          // Number keys to open bookmarks by index
+          if (!e.ctrlKey && !e.altKey && e.key >= '1' && e.key <= '9') {
+            const index = parseInt(e.key) - 1;
+            this.openBookmarkByIndex(index);
+          }
+          
+          // Custom shortcuts (Alt+Y, Alt+G, Alt+C)
+          if (e.altKey) {
+            const shortcut = `Alt+${e.key.toUpperCase()}`;
+            if (this.customShortcuts[shortcut]) {
+              e.preventDefault();
+              window.open(this.customShortcuts[shortcut], '_blank');
+            }
+          }
+          
+          // Search prefix handling (when focused in search)
+          if (document.activeElement === this.elements.searchInput && e.key === 'Enter') {
+            this.handleSearchShortcuts();
+          }
+        });
+      }
+
+      openBookmarkByIndex(index) {
+        const bookmarks = this.getFilteredBookmarks();
+        if (index >= 0 && index < bookmarks.length) {
+          window.open(bookmarks[index].url, '_blank');
+        }
+      }
+
+      handleSearchShortcuts() {
+        const query = this.elements.searchInput.value.trim();
+        
+        // Check for search prefixes
+        if (query.startsWith('g ')) {
+          const searchQuery = query.substring(2);
+          window.open(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`, '_blank');
+          this.elements.searchInput.value = '';
+        } else if (query.startsWith('yt ')) {
+          const searchQuery = query.substring(3);
+          window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`, '_blank');
+          this.elements.searchInput.value = '';
+        } else if (query.startsWith('c ')) {
+          const searchQuery = query.substring(2);
+          window.open(`https://chat.openai.com/?q=${encodeURIComponent(searchQuery)}`, '_blank');
+          this.elements.searchInput.value = '';
+        }
+      }
+
+      handleSearchInput() {
+        const query = this.elements.searchInput.value.trim();
+        
+        // Show/hide suggestions based on input
+        if (query.length > 0) {
+          this.showSearchSuggestions();
+        } else {
+          this.elements.searchSuggestions.style.display = 'none';
+        }
+      }
+
+      showSearchSuggestions() {
+        const query = this.elements.searchInput.value.trim();
+        const suggestions = [
+          { prefix: 'g', description: 'Search on Google' },
+          { prefix: 'yt', description: 'Search on YouTube' },
+          { prefix: 'c', description: 'Search on ChatGPT' }
+        ];
+        
+        let html = '';
+        
+        // Show suggestions that match the beginning of the query
+        suggestions.forEach(suggestion => {
+          if (query.length === 0 || suggestion.prefix.startsWith(query)) {
+            html += `<div class="search-suggestion" data-prefix="${suggestion.prefix}">
+                      <span class="prefix">${suggestion.prefix}</span> ${suggestion.description}
+                    </div>`;
+          }
+        });
+        
+        if (html) {
+          this.elements.searchSuggestions.innerHTML = html;
+          this.elements.searchSuggestions.style.display = 'block';
+          
+          // Add click handlers to suggestions
+          this.elements.searchSuggestions.querySelectorAll('.search-suggestion').forEach(el => {
+            el.addEventListener('mousedown', (e) => {
+              e.preventDefault();
+              const prefix = el.dataset.prefix;
+              this.elements.searchInput.value = `${prefix} `;
+              this.elements.searchInput.focus();
+              this.elements.searchSuggestions.style.display = 'none';
+            });
+          });
+        } else {
+          this.elements.searchSuggestions.style.display = 'none';
+        }
+      }
+
+      /* ================= STORAGE ================= */
+      saveToStorage() {
+        try {
+          localStorage.setItem(this.storageKey, JSON.stringify(this.bookmarks));
+        } catch (err) {
+          console.error('Storage error', err);
+        }
+      }
+      loadFromStorage() {
+        try {
+          const raw = localStorage.getItem(this.storageKey);
+          if (!raw) return null;
+          return JSON.parse(raw);
+        } catch (err) {
+          console.error('Load error', err);
+          return null;
+        }
+      }
+
+      /* ================= THEME ================= */
+      loadTheme() {
+        const saved = localStorage.getItem(this.themeKey) || 'light';
+        document.body.setAttribute('data-theme', saved);
+        this.updateThemeIcon(saved);
+      }
+      toggleTheme() {
+        const current = document.body.getAttribute('data-theme') || 'light';
+        const next = current === 'light' ? 'dark' : 'light';
+        document.body.setAttribute('data-theme', next);
+        localStorage.setItem(this.themeKey, next);
+        this.updateThemeIcon(next);
+        this.showToast(`Switched to ${next} mode`, 'info');
+      }
+      updateThemeIcon(theme) {
+        this.elements.themeToggle.textContent = theme === 'light' ? '🌙' : '☀️';
+      }
+
+      /* ================= RENDER / UI ================= */
+      getFilteredBookmarks() {
+        const query = (this.elements.searchInput.value || '').trim().toLowerCase();
+        let list = Array.from(this.bookmarks);
+
+        // Tab filter
+        if (this.currentTab === 'favorites') list = list.filter(b => b.favorite);
+        
+        // Tag filter
+        if (this.activeTagFilter) {
+          list = list.filter(b => b.tags && b.tags.includes(this.activeTagFilter));
+        }
+
+        // Search filter (title, tags, url)
+        if (query) {
+          const tokens = query.split(/\s+/).filter(Boolean);
+          list = list.filter(b => {
+            const hay = `${b.title} ${b.tags?.join(' ')} ${b.url} ${b.description}`.toLowerCase();
+            return tokens.every(t => hay.indexOf(t) !== -1);
+          });
+        }
+
+        // Sorting
+        const sortVal = this.elements.sortSelect.value;
+        if (sortVal === 'newest') list.sort((a,b) => b.createdAt - a.createdAt);
+        else if (sortVal === 'oldest') list.sort((a,b) => a.createdAt - b.createdAt);
+        else if (sortVal === 'name') list.sort((a,b) => (a.title||'').localeCompare(b.title||''));
+        else if (sortVal === 'favorites') list.sort((a,b) => (b.favorite?1:0) - (a.favorite?1:0) || (b.createdAt - a.createdAt));
+
+        return list;
+      }
+
+      renderBookmarks() {
+        const container = this.elements.bookmarksContainer;
+        const list = this.getFilteredBookmarks();
+
+        // Clear and render
+        container.innerHTML = '';
+        if (!list.length) {
+          this.elements.emptyState.classList.remove('hidden');
+        } else {
+          this.elements.emptyState.classList.add('hidden');
+          list.forEach(b => container.appendChild(this.createBookmarkCard(b)));
+        }
+      }
+
+      getAllTags() {
+        const tags = new Set();
+        this.bookmarks.forEach(bookmark => {
+          if (bookmark.tags && Array.isArray(bookmark.tags)) {
+            bookmark.tags.forEach(tag => tags.add(tag));
+          }
+        });
+        return Array.from(tags).sort();
+      }
+
+      renderTagFilters() {
+        const tags = this.getAllTags();
+        let html = '<div class="tag-filter" data-tag="all">All Tags</div>';
+        
+        tags.forEach(tag => {
+          html += `<div class="tag-filter" data-tag="${tag}">${this.escapeHtml(tag)}</div>`;
+        });
+        
+        this.elements.tagFiltersContainer.innerHTML = html;
+        
+        // Add event listeners
+        this.elements.tagFiltersContainer.querySelectorAll('.tag-filter').forEach(el => {
+          el.addEventListener('click', () => {
+            const tag = el.dataset.tag;
+            this.filterByTag(tag === 'all' ? null : tag);
+            
+            // Update active state
+            this.elements.tagFiltersContainer.querySelectorAll('.tag-filter').forEach(
+              filter => filter.classList.remove('active')
+            );
+            el.classList.add('active');
+          });
+        });
+      }
+
+      filterByTag(tag) {
+        this.activeTagFilter = tag;
+        this.renderBookmarks();
+      }
+
+      createBookmarkCard(bookmark) {
+        const { id, title, url, description = '', tags = [], favorite } = bookmark;
+        const card = document.createElement('div');
+        card.className = 'bookmark-card';
+        if (this.currentView === 'list') card.classList.add('list-view');
+        card.setAttribute('draggable', 'true');
+        card.dataset.id = id;
+
+        const favicon = this.getFaviconUrl(url);
+
+        // Build inner HTML
+        card.innerHTML = `
+          <button class="favorite-btn ${favorite ? 'active' : ''}" title="Toggle favorite">★</button>
+          <div class="bookmark-header">
+            <div class="bookmark-info">
+              <img class="favicon" src="${favicon}" alt="" onerror="this.style.opacity=.5;this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=64 height=64></svg>'" />
+              <div style="min-width:0">
+                <div class="bookmark-title">${this.escapeHtml(title || this.getDefaultTitle(url))}</div>
+                <div class="bookmark-url">${this.escapeHtml(url)}</div>
+              </div>
+            </div>
+            <div style="font-size:.8rem; color:var(--text-muted); margin-left:8px;">${this.timeAgo(bookmark.createdAt)}</div>
+          </div>
+          <div class="bookmark-description">${this.escapeHtml(description || '')}</div>
+          <div class="bookmark-tags">${(tags||[]).map(t => `<span class="tag">${this.escapeHtml(t)}</span>`).join('')}</div>
+          <div class="bookmark-actions">
+            <button class="action-btn open-btn" title="Open in new tab">Open</button>
+            <button class="action-btn copy-btn" title="Copy URL">Copy</button>
+            <button class="action-btn edit-btn" title="Edit bookmark">Edit</button>
+            <button class="action-btn danger delete-btn" title="Delete">Delete</button>
+          </div>
+        `;
+
+        // Drag events
+        card.addEventListener('dragstart', (e) => {
+          this.draggedElement = card;
+          card.classList.add('dragging');
+          try { e.dataTransfer.setData('text/plain', id); } catch (err) {}
+        });
+        card.addEventListener('dragend', () => {
+          card.classList.remove('dragging');
+          this.draggedElement = null;
+          this.updateOrderFromDOM();
+        });
+
+        // Action buttons
+        const favBtn = card.querySelector('.favorite-btn');
+        favBtn.addEventListener('click', () => {
+          this.toggleFavorite(id, favBtn);
+        });
+
+        card.querySelector('.open-btn').addEventListener('click', () => {
+          window.open(url, '_blank');
+        });
+        card.querySelector('.copy-btn').addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(url);
+            this.showToast('URL copied to clipboard', 'success');
+          } catch {
+            this.showToast('Unable to copy — permission denied', 'error');
+          }
+        });
+        card.querySelector('.edit-btn').addEventListener('click', () => {
+          this.openModal('edit', bookmark);
+        });
+        card.querySelector('.delete-btn').addEventListener('click', () => {
+          this.deleteBookmarkWithConfirm(id);
+        });
+
+        return card;
+      }
+
+      escapeHtml(s) {
+        if (!s) return '';
+        return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+      }
+
+      timeAgo(ts) {
+        if (!ts) return '';
+        const sec = Math.floor((Date.now() - ts) / 1000);
+        if (sec < 60) return `${sec}s`;
+        const min = Math.floor(sec / 60);
+        if (min < 60) return `${min}m`;
+        const hr = Math.floor(min / 60);
+        if (hr < 24) return `${hr}h`;
+        const d = Math.floor(hr / 24);
+        return `${d}d`;
+      }
+
+      /* ================= MODAL / FORM ================= */
+      openModal(mode='add', bookmark=null) {
+        this.elements.modalOverlay.classList.add('show');
+        this.elements.modalOverlay.setAttribute('aria-hidden','false');
+        if (mode === 'edit' && bookmark) {
+          this.editingId = bookmark.id;
+          this.elements.modalTitle.textContent = 'Edit Bookmark';
+          this.elements.titleInput.value = bookmark.title || '';
+          this.elements.urlInput.value = bookmark.url || '';
+          this.elements.descriptionInput.value = bookmark.description || '';
+          this.elements.tagsInput.value = (bookmark.tags||[]).join(', ');
+        } else {
+          this.editingId = null;
+          this.elements.modalTitle.textContent = 'Add Bookmark';
+          this.elements.bookmarkForm.reset();
+        }
+        setTimeout(()=> this.elements.titleInput.focus(), 100);
+      }
+
+      closeModal() {
+        this.elements.modalOverlay.classList.remove('show');
+        this.elements.modalOverlay.setAttribute('aria-hidden','true');
+        this.editingId = null;
+        this.elements.bookmarkForm.reset();
+      }
+
+      saveBookmarkFromForm() {
+        const t = (this.elements.titleInput.value || '').trim();
+        let u = (this.elements.urlInput.value || '').trim();
+        const desc = (this.elements.descriptionInput.value || '').trim();
+        const tags = (this.elements.tagsInput.value || '').split(',').map(s => s.trim()).filter(Boolean);
+
+        if (!u) { this.showToast('URL is required', 'error'); return; }
+        u = this.normalizeUrl(u);
+
+        // If title absent, create from hostname
+        const title = t || this.getDefaultTitle(u);
+
+        if (this.editingId) {
+          // Edit existing
+          const idx = this.bookmarks.findIndex(b => b.id == this.editingId);
+          if (idx === -1) { this.showToast('Bookmark not found', 'error'); this.closeModal(); return; }
+          this.bookmarks[idx] = { ...this.bookmarks[idx], title, url: u, description: desc, tags, updatedAt: Date.now() };
+          this.saveToStorage();
+          this.showToast('Bookmark updated', 'success');
+        } else {
+          // Create new
+          const newBookmark = {
+            id: Date.now() + Math.floor(Math.random()*1000),
+            title,
+            url: u,
+            description: desc,
+            tags,
+            favorite: false,
+            createdAt: Date.now()
+          };
+          this.bookmarks.unshift(newBookmark);
+          this.saveToStorage();
+          this.showToast('Bookmark added', 'success');
+        }
+        this.closeModal();
+        this.renderBookmarks();
+        this.renderTagFilters();
+      }
+
+      getDefaultTitle(url) {
+        try {
+          const u = new URL(this.normalizeUrl(url));
+          return u.hostname.replace('www.','');
+        } catch {
+          return url;
+        }
+      }
+
+      normalizeUrl(url) {
+        if (!/^https?:\/\//i.test(url)) return 'https://' + url;
+        return url;
+      }
+
+      toggleFavorite(id, btnEl) {
+        const idx = this.bookmarks.findIndex(b => b.id == id);
+        if (idx === -1) return;
+        this.bookmarks[idx].favorite = !this.bookmarks[idx].favorite;
+        this.saveToStorage();
+        btnEl.classList.toggle('active', this.bookmarks[idx].favorite);
+        this.showToast(this.bookmarks[idx].favorite ? 'Added to favorites' : 'Removed from favorites', 'info');
+        // Optionally re-render if current tab is favorites to remove
+        if (this.currentTab === 'favorites') this.renderBookmarks();
+      }
+
+      deleteBookmarkWithConfirm(id) {
+        const idx = this.bookmarks.findIndex(b => b.id == id);
+        if (idx === -1) return;
+        const ok = confirm('Delete this bookmark? This action cannot be undone.');
+        if (!ok) return;
+        this.bookmarks.splice(idx,1);
+        this.saveToStorage();
+        this.renderBookmarks();
+        this.renderTagFilters();
+        this.showToast('Bookmark deleted', 'success');
+      }
+
+      /* ================= IMPORT / EXPORT ================= */
+      async handleFileImport(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          let arr = [];
+          if (Array.isArray(parsed)) arr = parsed;
+          else if (Array.isArray(parsed.bookmarks)) arr = parsed.bookmarks;
+          else { this.showToast('Invalid file format', 'error'); return; }
+
+          // Normalize and assign IDs
+          const incoming = arr.map(item => ({
+            id: Date.now() + Math.floor(Math.random()*1000) + Math.floor(Math.random()*1000),
+            title: item.title || item.name || item.label || this.getDefaultTitle(item.url || ''),
+            url: this.normalizeUrl(item.url || item.link || ''),
+            description: item.description || '',
+            tags: (item.tags || item.tag || []).map ? item.tags : (item.tags ? String(item.tags).split(',').map(s => s.trim()).filter(Boolean) : []),
+            favorite: !!item.favorite,
+            createdAt: item.createdAt || Date.now()
+          }));
+          // Merge: prepend
+          this.bookmarks = [...incoming, ...this.bookmarks];
+          this.saveToStorage();
+          this.elements.fileInput.value = '';
+          this.renderBookmarks();
+          this.renderTagFilters();
+          this.showToast(`Imported ${incoming.length} bookmarks`, 'success');
+        } catch (err) {
+          console.error(err);
+          this.showToast('Failed to import file', 'error');
+        }
+      }
+
+      exportBookmarks() {
+        try {
+          const data = JSON.stringify(this.bookmarks, null, 2);
+          const blob = new Blob([data], { type:'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          const now = new Date(); const ts = now.toISOString().slice(0,10);
+          a.download = `bookmarks-${ts}.json`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          this.showToast('Exported bookmarks', 'success');
+        } catch (err) {
+          console.error(err);
+          this.showToast('Export failed', 'error');
+        }
+      }
+
+      /* ================= DRAG & DROP ORDER MANAGEMENT ================= */
+      getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.bookmark-card:not(.dragging)')];
+        let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
+        for (const child of draggableElements) {
+          const box = child.getBoundingClientRect();
+          const offset = y - box.top - box.height / 2;
+          if (offset < 0 && offset > closest.offset) {
+            closest = { offset, element: child };
+          }
+        }
+        return closest.element;
+      }
+
+      updateOrderFromDOM() {
+        const container = this.elements.bookmarksContainer;
+        const ids = Array.from(container.children).map(c => Number(c.dataset.id));
+        if (!ids.length) return;
+        // Reorder bookmarks to match ids
+        const map = new Map(this.bookmarks.map(b => [b.id, b]));
+        const reordered = ids.map(id => map.get(id)).filter(Boolean);
+        // If some bookmarks missing (shouldn't), append them
+        const remaining = this.bookmarks.filter(b => !ids.includes(b.id));
+        this.bookmarks = [...reordered, ...remaining];
+        this.saveToStorage();
+        this.renderBookmarks();
+        this.showToast('Bookmarks reordered', 'info');
+      }
+
+      /* ================= HELPERS ================= */
+      getFaviconUrl(url) {
+        try {
+          return 'https://www.google.com/s2/favicons?sz=64&domain_url=' + encodeURIComponent(url);
+        } catch { return ''; }
+      }
+
+      showToast(message = '', type = 'info', duration = 3000) {
+        const el = this.elements.toast;
+        clearTimeout(this.toastTimer);
+        el.className = 'toast';
+        el.classList.add('show', type);
+        el.textContent = message;
+        this.toastTimer = setTimeout(() => {
+          el.classList.remove('show');
+        }, duration);
+      }
+
+      switchTab(tabName) {
+        this.currentTab = tabName;
+        this.elements.tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
+        // mobile nav active handled by mobile click, but ensure desktop tabs updated
+        this.renderBookmarks();
+      }
+
+      switchView(view) {
+        this.currentView = view;
+        // toggle buttons
+        this.elements.gridViewBtn.classList.toggle('active', view === 'grid');
+        this.elements.listViewBtn.classList.toggle('active', view === 'list');
+        // adjust container class
+        const container = this.elements.bookmarksContainer;
+        container.className = view === 'grid' ? 'bookmarks-grid' : 'bookmarks-list';
+        this.renderBookmarks();
+      }
+    }
+
+    // Instantiate
+    document.addEventListener('DOMContentLoaded', () => {
+      const app = new ModernBookmarkManager();
+      // Accessibility: focus the search field initially
+      setTimeout(()=> document.getElementById('searchInput').focus(), 400);
+    });
+  </script>
+</body>
+</html>
